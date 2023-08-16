@@ -1,5 +1,7 @@
 ﻿using LightResolver.Logic.Input;
 using LightResolver.Logic.Models;
+using System.Linq;
+using static System.Collections.Specialized.BitVector32;
 
 namespace LightResolver.Logic
 {
@@ -23,15 +25,13 @@ namespace LightResolver.Logic
 
         public OptimizationResult OptimizeComposition(Composition composition)
         {
-            int Wattage = 0;
-            int Price = 0;
-                 
 
+            int sectionsCount = composition.Sections.Count;
 
-            for (int i = 0; i < composition.Sections.Count; i++)
+            for (int i = 0; i < sectionsCount; i++)
             {
 
-                Section section = composition.Sections[i];
+                Models.Section section = composition.Sections[i];
                 
 
                 for(int j = 0; j < section.Shelves.Count; j++)
@@ -39,11 +39,10 @@ namespace LightResolver.Logic
                     Shelf shelf = section.Shelves[j];
                     Shelf previousShelf = composition.ShelfAt(i - 1, j);
 
-                    int lastSectionIndex = composition.Sections.Count - 1;
+                    int lastSectionIndex = sectionsCount - 1;
 
                     bool hasLight = shelf.HasLight;
-
-                    //power left only
+                    
 
                     if (i == 0) // First section
                     {
@@ -81,7 +80,76 @@ namespace LightResolver.Logic
                 }
 
             }
+
+            // Set price for shelfs and wattage
+
+            double wattage = 0;
+            decimal shelfPrice = 0;
+
+            for (int i = 0; i < sectionsCount; i++)
+            {
+                Models.Section section = composition.Sections[i];
+
+                for (int j = 0; j < section.Shelves.Count; j++)
+                {
+                    Shelf shelf = section.Shelves[j];
+                    shelf.Width = section.Width;
+
+                    shelfPrice += shelf.Price;
+                    wattage += shelf.Wattage;
+
+                }
+            }
+
+            // Set price for walls
+
+            decimal wallPrice = 0;
+
+            OuterWall leftOuterWall = composition.LeftOuterWall;
+            OuterWall rightOuterWall = composition.RightOuterWall;
+
+
+            if(wattage == 0.0)
+            {
+                leftOuterWall.Type = WallType.NotElectrified;
+                leftOuterWall.WattageConsumption = 0.0;
+
+                rightOuterWall.Type = WallType.NotElectrified;
+                rightOuterWall.WattageConsumption = 0.0;
+
+                wallPrice += leftOuterWall.Price + rightOuterWall.Price;
+            }
+
+            else if (wattage > 0.0 && wattage < 100)
+            {
+                leftOuterWall.Type = WallType.A1;
+                leftOuterWall.WattageConsumption = wattage;
+
+                rightOuterWall.Type = WallType.NotElectrified;
+                rightOuterWall.WattageConsumption = 0.0;
+
+                wallPrice += leftOuterWall.Price + rightOuterWall.Price;
+            }
+
+            else if (wattage > 100 && wattage < 200)
+            {
+                leftOuterWall.Type = WallType.A1;
+                leftOuterWall.WattageConsumption = wattage;
+
+                rightOuterWall.Type = WallType.A2;
+                rightOuterWall.WattageConsumption = 0.0;
+
+                wallPrice += leftOuterWall.Price + rightOuterWall.Price;
+            }
             
+            else
+            {
+                // too much power used
+            }
+
+            decimal totalPrice = shelfPrice + wallPrice;
+
+
             //TODO: Create logic that calculates the optimal lighting composition with the cheapest price
 
             //TODO: Update the composition model objects with OuterWallTypes and ShelfTypes
