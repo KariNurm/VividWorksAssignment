@@ -1,7 +1,5 @@
 ﻿using LightResolver.Logic.Input;
 using LightResolver.Logic.Models;
-using System.Linq;
-using static System.Collections.Specialized.BitVector32;
 
 namespace LightResolver.Logic
 {
@@ -23,26 +21,27 @@ namespace LightResolver.Logic
         /// <returns></returns>
         /// 
 
-        public OptimizationResult OptimizeComposition(Composition composition)
+        // Set types for shelves
+        private void ShelfTypeAssigner(Composition composition, double wattage)
         {
-
             int sectionsCount = composition.Sections.Count;
 
             for (int i = 0; i < sectionsCount; i++)
             {
 
-                Models.Section section = composition.Sections[i];
-                
+                Section section = composition.Sections[i];
 
-                for(int j = 0; j < section.Shelves.Count; j++)
+
+                for (int j = 0; j < section.Shelves.Count; j++)
                 {
                     Shelf shelf = section.Shelves[j];
                     Shelf previousShelf = composition.ShelfAt(i - 1, j);
 
                     int lastSectionIndex = sectionsCount - 1;
+                    int previousSectionIndex = i - 1; 
 
                     bool hasLight = shelf.HasLight;
-                    
+
 
                     if (i == 0) // First section
                     {
@@ -50,23 +49,29 @@ namespace LightResolver.Logic
                     }
                     else if (i == lastSectionIndex) // Last section
                     {
-                        shelf.Type = hasLight ? ShelfType.H : ShelfType.E;
+                        if(wattage > 100) shelf.Type = hasLight ? ShelfType.G2 : ShelfType.E;
+                        else shelf.Type = hasLight ? ShelfType.H : ShelfType.E;
+
                         if (previousShelf.Type == ShelfType.E) previousShelf.Type = ShelfType.EI;
                     }
-                    else if(i != 0) // Middle section
+                    else if (i != 0) // Middle section
                     {
-                        if(hasLight)
+                        if (hasLight)
                         {
                             shelf.Type = ShelfType.H;
-                            if(previousShelf.HasLight && i - 1 != 0)
+                            if (previousShelf.HasLight && previousSectionIndex != 0)
                             {
                                 previousShelf.Type = ShelfType.H;
                             }
-                            else if(previousShelf.HasLight && i - 1 == 0)
+                            else if (!previousShelf.HasLight && previousSectionIndex != 0) 
+                            {
+                                previousShelf.Type = ShelfType.EI;
+                            }
+                            else if (previousShelf.HasLight && previousSectionIndex == 0)
                             {
                                 previousShelf.Type = ShelfType.G1;
                             }
-                            else if (!previousShelf.HasLight && i - 1 == 0)
+                            else if (!previousShelf.HasLight && previousSectionIndex == 0)
                             {
                                 previousShelf.Type = ShelfType.F1;
                             }
@@ -76,19 +81,26 @@ namespace LightResolver.Logic
                             shelf.Type = ShelfType.E;
                         }
                     }
-                    
+
                 }
 
             }
+        }
 
-            // Set price for shelfs and wattage
+        public OptimizationResult OptimizeComposition(Composition composition)
+        {
 
+            int sectionsCount = composition.Sections.Count;
             double wattage = 0;
             decimal shelfPrice = 0;
 
+            ShelfTypeAssigner(composition, wattage);
+
+            // Set price for shelfs and wattage
+
             for (int i = 0; i < sectionsCount; i++)
             {
-                Models.Section section = composition.Sections[i];
+                Section section = composition.Sections[i];
 
                 for (int j = 0; j < section.Shelves.Count; j++)
                 {
@@ -140,6 +152,7 @@ namespace LightResolver.Logic
                 rightOuterWall.WattageConsumption = 0.0;
 
                 wallPrice += leftOuterWall.Price + rightOuterWall.Price;
+                ShelfTypeAssigner(composition, wattage);
             }
             
             else
